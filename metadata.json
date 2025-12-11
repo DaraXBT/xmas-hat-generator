@@ -1,0 +1,5 @@
+{
+  "name": "圣诞帽生成器",
+  "description": "上传头像，选择圣诞帽素材，一键生成节日头像。",
+  "requestFramePermissions": []
+}
