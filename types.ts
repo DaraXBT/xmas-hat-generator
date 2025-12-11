@@ -12,11 +12,3 @@ export interface PlacedHat extends Hat {
   rotation: number;
   isMirrored: boolean;
 }
-
-export interface EditorState {
-  imageSrc: string | null;
-  selectedHat: Hat | null;
-  hatPosition: { x: number; y: number };
-  hatScale: number;
-  hatRotation: number;
-}

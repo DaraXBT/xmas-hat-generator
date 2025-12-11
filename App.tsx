@@ -78,7 +78,6 @@ const App: React.FC = () => {
                       accept="image/*" 
                       onChange={handleFileChange} 
                       className="hidden" 
-                      disabled={!hasImage && false /* Always allow upload via this button too? Or disable if logic dictates? User flow suggests enabling. */} 
                     />
                  </label>
 
