@@ -1,26 +1,42 @@
 <!DOCTYPE html>
-<html lang="zh-CN">
+<html lang="km">
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>圣诞帽生成器</title>
+    <title>តស់បង្កើតមួកណូអែល</title>
     <link rel="manifest" href="/manifest.json" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Kantumruy+Pro:wght@300;400;500;600;700&display=swap"
+      rel="stylesheet" />
     <script src="https://cdn.tailwindcss.com"></script>
-  <script type="importmap">
-{
-  "imports": {
-    "react": "https://esm.sh/react@^19.2.1",
-    "react-dom/": "https://esm.sh/react-dom@^19.2.1/",
-    "react/": "https://esm.sh/react@^19.2.1/",
-    "lucide-react": "https://esm.sh/lucide-react@^0.560.0",
-    "vite": "https://esm.sh/vite@^7.2.7",
-    "@vitejs/plugin-react": "https://esm.sh/@vitejs/plugin-react@^5.1.2",
-    "@google/genai": "https://esm.sh/@google/genai@^1.33.0"
-  }
-}
-</script>
-</head>
-  <body class="bg-[#f5f5f7] text-[#1d1d1f] antialiased">
+    <script>
+      tailwind.config = {
+        theme: {
+          extend: {
+            fontFamily: {
+              sans: ["Kantumruy Pro", "sans-serif"],
+            },
+          },
+        },
+      };
+    </script>
+    <script type="importmap">
+      {
+        "imports": {
+          "react": "https://esm.sh/react@^19.2.1",
+          "react-dom/": "https://esm.sh/react-dom@^19.2.1/",
+          "react/": "https://esm.sh/react@^19.2.1/",
+          "lucide-react": "https://esm.sh/lucide-react@^0.560.0",
+          "vite": "https://esm.sh/vite@^7.2.7",
+          "@vitejs/plugin-react": "https://esm.sh/@vitejs/plugin-react@^5.1.2",
+          "@google/genai": "https://esm.sh/@google/genai@^1.33.0"
+        }
+      }
+    </script>
+  </head>
+  <body class="bg-[#f5f5f7] text-[#1d1d1f] antialiased font-sans">
     <div id="root"></div>
     <script type="module" src="/src/main.tsx"></script>
   </body>

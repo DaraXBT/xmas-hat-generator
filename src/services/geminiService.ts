@@ -6,5 +6,5 @@ export const generateChristmasGreeting = async (): Promise<string> => {
   await new Promise((resolve) => setTimeout(resolve, 600));
 
   // 返回固定的备选文案
-  return "圣诞快乐，喜乐长安！🎄";
+  return "រីករាយថ្ងៃណូអែល! សុខភាពល្អ និងសុភមង្គល! 🎄";
 };
