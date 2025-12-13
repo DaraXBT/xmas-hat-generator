@@ -9,6 +9,7 @@ const App: React.FC = () => {
   const [hasImage, setHasImage] = useState(false);
   const [isCopied, setIsCopied] = useState(false);
   const [isPlaying, setIsPlaying] = useState(false);
+  const [audioReady, setAudioReady] = useState(false);
   const editorRef = useRef<EditorHandle>(null);
   const audioRef = useRef<HTMLAudioElement | null>(null);
 
@@ -33,6 +34,7 @@ const App: React.FC = () => {
 
     const handleCanPlay = () => {
       // Audio can play - ready to start
+      setAudioReady(true);
     };
 
     const handleLoadedData = () => {
@@ -45,45 +47,47 @@ const App: React.FC = () => {
     audio.addEventListener("canplay", handleCanPlay);
     audio.addEventListener("loadeddata", handleLoadedData);
 
-    // Multiple attempts to play
-    const ensurePlay = async () => {
-      // Attempt 1: Immediate play
+    // Attempt to start audio with unmuting trick
+    const startAudio = async () => {
       try {
-        audio.volume = 0.5; // Set volume to 50%
+        // Start muted to bypass autoplay policy
+        audio.muted = true;
+        audio.volume = 0.5;
         await audio.play();
-        return;
+
+        // Small delay then unmute
+        setTimeout(() => {
+          audio.muted = false;
+        }, 100);
       } catch (error) {
-        // Autoplay blocked, will try on user interaction
+        // If still blocked, wait for user interaction
+        const playOnInteraction = async () => {
+          try {
+            audio.muted = false;
+            audio.volume = 0.5;
+            await audio.play();
+
+            // Remove all listeners once playing
+            document.removeEventListener("click", clickHandler);
+            document.removeEventListener("keydown", keyHandler);
+            document.removeEventListener("touchstart", touchHandler);
+          } catch (e) {
+            // Failed to play after user interaction
+          }
+        };
+
+        const clickHandler = () => playOnInteraction();
+        const keyHandler = () => playOnInteraction();
+        const touchHandler = () => playOnInteraction();
+
+        document.addEventListener("click", clickHandler, {once: true});
+        document.addEventListener("keydown", keyHandler, {once: true});
+        document.addEventListener("touchstart", touchHandler, {once: true});
       }
-
-      // Attempt 2: On any user interaction
-      const playOnInteraction = async () => {
-        try {
-          await audio.play();
-
-          // Remove all listeners once playing
-          document.removeEventListener("click", clickHandler);
-          document.removeEventListener("keydown", keyHandler);
-          document.removeEventListener("touchstart", touchHandler);
-          document.removeEventListener("scroll", scrollHandler);
-        } catch (e) {
-          // Failed to play after user interaction
-        }
-      };
-
-      const clickHandler = () => playOnInteraction();
-      const keyHandler = () => playOnInteraction();
-      const touchHandler = () => playOnInteraction();
-      const scrollHandler = () => playOnInteraction();
-
-      document.addEventListener("click", clickHandler, {once: true});
-      document.addEventListener("keydown", keyHandler, {once: true});
-      document.addEventListener("touchstart", touchHandler, {once: true});
-      document.addEventListener("scroll", scrollHandler, {once: true});
     };
 
     // Small delay to ensure DOM is ready
-    setTimeout(ensurePlay, 500);
+    setTimeout(startAudio, 100);
 
     return () => {
       audio.removeEventListener("play", handlePlay);
@@ -147,7 +151,7 @@ const App: React.FC = () => {
         autoPlay
         loop
         preload="auto"
-        muted={false}
+        muted
         playsInline
         className="hidden">
         <source src="/christmas-song.mp3" type="audio/mpeg" />
