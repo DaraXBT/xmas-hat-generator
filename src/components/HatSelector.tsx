@@ -9,42 +9,48 @@ interface HatSelectorProps {
 const HatSelector: React.FC<HatSelectorProps> = ({ onSelect, selectedHatId }) => {
   const [localHats, setLocalHats] = useState<Hat[]>([]);
 
-  // Only use dynamically loaded local hats, no static SVGs
+  // Only use dynamically loaded local hats
   const allHats = localHats;
 
   useEffect(() => {
     let active = true;
-    let currentIndex = 1;
-    const maxIndex = 50; // Safety limit
+    const maxIndex = 30; // 尝试并行加载前 30 张图片
 
-    const loadNextImage = () => {
-      if (!active || currentIndex > maxIndex) return;
-
+    const loadHat = (index: number) => {
       const img = new Image();
-      // Expecting images named 1.png, 2.png, etc. in the public/hats directory
-      // STRICTLY using absolute path /hats/ to reference assets in the public folder
-      const src = `/hats/${currentIndex}.png`;
+      // 使用绝对路径 /hats/ 确保在任何路由下都能正确访问 public 目录
+      const src = `/hats/${index}.png`;
       
       img.onload = () => {
         if (!active) return;
         
-        setLocalHats(prev => [
-          ...prev, 
-          { id: `local-${currentIndex}`, name: `款式 ${currentIndex}`, src }
-        ]);
-        
-        currentIndex++;
-        loadNextImage();
+        setLocalHats(prev => {
+          // 避免重复添加
+          if (prev.some(h => h.src === src)) return prev;
+          
+          const newHat = { id: `local-${index}`, name: `款式 ${index}`, src };
+          const newList = [...prev, newHat];
+          
+          // 保持按数字顺序排序
+          return newList.sort((a, b) => {
+            const getNum = (str: string) => parseInt(str.split('-')[1] || '0');
+            return getNum(a.id) - getNum(b.id);
+          });
+        });
       };
 
+      // 并行加载时，单个失败不影响其他
       img.onerror = () => {
-        // Stop loading when a file is not found
+        // console.log(`Failed to load ${src}`);
       };
 
       img.src = src;
     };
 
-    loadNextImage();
+    // 并行发起请求，不再依赖递归
+    for (let i = 1; i <= maxIndex; i++) {
+      loadHat(i);
+    }
 
     return () => {
       active = false;

@@ -47,7 +47,7 @@ const App: React.FC = () => {
             
             {/* 1. Header Content */}
             <div>
-              <h1 className="text-4xl md:text-5xl font-semibold tracking-tight text-[#1d1d1f] mb-4">
+              <h1 className="text-3xl md:text-4xl font-semibold tracking-tight text-[#1d1d1f] mb-4">
                 圣诞帽生成器
               </h1>
               <p className="text-lg md:text-xl leading-relaxed font-medium text-[#1d1d1f]">
