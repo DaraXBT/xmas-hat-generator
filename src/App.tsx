@@ -125,7 +125,7 @@ const App: React.FC = () => {
             target="_blank"
             rel="noopener noreferrer"
             className="inline-flex items-center gap-1.5 text-xs text-[#86868b] hover:text-[#1d1d1f] transition-colors">
-            <span>Created by</span>
+            <span>Credit to</span>
             <svg
               viewBox="0 0 24 24"
               className="w-3 h-3 fill-current"
