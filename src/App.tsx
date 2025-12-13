@@ -9,7 +9,6 @@ const App: React.FC = () => {
   const [hasImage, setHasImage] = useState(false);
   const [isCopied, setIsCopied] = useState(false);
   const [isPlaying, setIsPlaying] = useState(false);
-  const [audioReady, setAudioReady] = useState(false);
   const editorRef = useRef<EditorHandle>(null);
   const audioRef = useRef<HTMLAudioElement | null>(null);
 
@@ -34,7 +33,6 @@ const App: React.FC = () => {
 
     const handleCanPlay = () => {
       // Audio can play - ready to start
-      setAudioReady(true);
     };
 
     const handleLoadedData = () => {
