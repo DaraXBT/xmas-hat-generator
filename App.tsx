@@ -1,5 +1,5 @@
 import React, {useState, useRef, useEffect} from "react";
-import {Upload, Download, Copy, Check} from "lucide-react";
+import {Upload, Download, Copy, Check, Volume2, VolumeX} from "lucide-react";
 import Editor, {EditorHandle} from "./components/Editor";
 import HatSelector from "./components/HatSelector";
 import {Hat} from "./types";
@@ -8,34 +8,132 @@ const App: React.FC = () => {
   const [hatToAdd, setHatToAdd] = useState<Hat | null>(null);
   const [hasImage, setHasImage] = useState(false);
   const [isCopied, setIsCopied] = useState(false);
+  const [isPlaying, setIsPlaying] = useState(false);
   const editorRef = useRef<EditorHandle>(null);
   const audioRef = useRef<HTMLAudioElement | null>(null);
 
-  // Auto-play Christmas song on mount
+  // Handle audio play/pause state
   useEffect(() => {
-    audioRef.current = new Audio("/christmas-song.mp3");
-    audioRef.current.loop = true;
-    audioRef.current.volume = 0.3;
+    console.log("🎅 Component mounted, checking audio element...");
 
-    // Attempt to play (might be blocked by browser autoplay policy)
-    const playPromise = audioRef.current.play();
-
-    if (playPromise !== undefined) {
-      playPromise.catch(() => {
-        // Auto-play was prevented, will play on first user interaction
-        const playOnInteraction = () => {
-          audioRef.current?.play();
-          document.removeEventListener("click", playOnInteraction);
-        };
-        document.addEventListener("click", playOnInteraction);
-      });
+    const audio = audioRef.current;
+    if (!audio) {
+      console.error("❌ Audio element not found! Ref is null.");
+      return;
     }
 
+    console.log("✅ Audio element found:", audio);
+
+    const handlePlay = () => {
+      setIsPlaying(true);
+      console.log("✅ Music is playing!");
+    };
+
+    const handlePause = () => {
+      setIsPlaying(false);
+      console.log("⏸️ Music paused");
+    };
+
+    const handleError = (e: Event) => {
+      console.error("❌ Audio error:", e);
+    };
+
+    const handleCanPlay = () => {
+      console.log("🎵 Audio can play - ready to start");
+    };
+
+    const handleLoadedData = () => {
+      console.log("📦 Audio data loaded");
+    };
+
+    audio.addEventListener("play", handlePlay);
+    audio.addEventListener("pause", handlePause);
+    audio.addEventListener("error", handleError);
+    audio.addEventListener("canplay", handleCanPlay);
+    audio.addEventListener("loadeddata", handleLoadedData);
+
+    // Multiple attempts to play
+    const ensurePlay = async () => {
+      console.log("🎄 Attempting to play Christmas music...");
+      console.log("📊 Audio state:", {
+        paused: audio.paused,
+        currentTime: audio.currentTime,
+        duration: audio.duration,
+        readyState: audio.readyState,
+        src: audio.src,
+      });
+
+      // Attempt 1: Immediate play
+      try {
+        audio.volume = 0.5; // Set volume to 50%
+        console.log("🔊 Volume set to 50%");
+        await audio.play();
+        console.log("✅ Autoplay succeeded!");
+        return;
+      } catch (error) {
+        console.log("⚠️ Autoplay blocked. Error:", error);
+        console.log("Setting up user interaction trigger...");
+      }
+
+      // Attempt 2: On any user interaction
+      const playOnInteraction = async (eventType: string) => {
+        try {
+          console.log(`🎯 User ${eventType} detected - playing music...`);
+          await audio.play();
+          console.log("✅ Music started after user interaction!");
+
+          // Remove all listeners once playing
+          document.removeEventListener("click", clickHandler);
+          document.removeEventListener("keydown", keyHandler);
+          document.removeEventListener("touchstart", touchHandler);
+          document.removeEventListener("scroll", scrollHandler);
+        } catch (e) {
+          console.error("❌ Failed to play:", e);
+        }
+      };
+
+      const clickHandler = () => playOnInteraction("click");
+      const keyHandler = () => playOnInteraction("keypress");
+      const touchHandler = () => playOnInteraction("touch");
+      const scrollHandler = () => playOnInteraction("scroll");
+
+      document.addEventListener("click", clickHandler, {once: true});
+      document.addEventListener("keydown", keyHandler, {once: true});
+      document.addEventListener("touchstart", touchHandler, {once: true});
+      document.addEventListener("scroll", scrollHandler, {once: true});
+
+      console.log("👆 Click, tap, or scroll anywhere to start the music!");
+    };
+
+    // Small delay to ensure DOM is ready
+    setTimeout(ensurePlay, 500);
+
     return () => {
-      audioRef.current?.pause();
-      audioRef.current = null;
+      audio.removeEventListener("play", handlePlay);
+      audio.removeEventListener("pause", handlePause);
+      audio.removeEventListener("error", handleError);
+      audio.removeEventListener("canplay", handleCanPlay);
+      audio.removeEventListener("loadeddata", handleLoadedData);
     };
   }, []);
+
+  const toggleMusic = async () => {
+    if (audioRef.current) {
+      try {
+        if (isPlaying) {
+          audioRef.current.pause();
+          setIsPlaying(false);
+          console.log("⏸️ Music paused");
+        } else {
+          await audioRef.current.play();
+          setIsPlaying(true);
+          console.log("▶️ Music playing");
+        }
+      } catch (error) {
+        console.error("Toggle error:", error);
+      }
+    }
+  };
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files[0] && editorRef.current) {
@@ -55,6 +153,37 @@ const App: React.FC = () => {
 
   return (
     <div className="min-h-screen bg-[#f5f5f7] font-sans">
+      {/* Hidden Audio Element with autoplay */}
+      <audio
+        ref={audioRef}
+        autoPlay
+        loop
+        preload="auto"
+        muted={false}
+        playsInline
+        className="hidden">
+        <source src="/christmas-song.mp3" type="audio/mpeg" />
+        Your browser does not support the audio element.
+      </audio>
+
+      {/* Music Toggle Button - Fixed position */}
+      <button
+        onClick={toggleMusic}
+        className={`fixed top-6 right-6 z-50 w-12 h-12 rounded-full shadow-lg flex items-center justify-center transition-all ${
+          isPlaying
+            ? "bg-[#0071e3] hover:bg-[#0077ed] border-2 border-[#0071e3]"
+            : "bg-white hover:bg-[#fafafa] border border-[#d2d2d7] hover:border-[#86868b] animate-pulse"
+        }`}
+        title={
+          isPlaying ? "Pause Christmas music 🎵" : "Play Christmas music 🎄"
+        }>
+        {isPlaying ? (
+          <Volume2 className="w-5 h-5 text-white" />
+        ) : (
+          <VolumeX className="w-5 h-5 text-[#ff3b30]" />
+        )}
+      </button>
+
       <div className="max-w-[980px] mx-auto px-6 py-12 md:py-20">
         <main className="grid grid-cols-1 md:grid-cols-12 gap-12 items-start">
           {/* Left Column: Editor - Occupies more space */}
