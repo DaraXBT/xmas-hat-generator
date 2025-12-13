@@ -1,5 +1,5 @@
-import React, {useState, useRef} from "react";
-import {Upload, Download, Copy, Check} from "lucide-react";
+import React, {useState, useRef, useEffect} from "react";
+import {Upload, Download, Copy, Check, Volume2, VolumeX} from "lucide-react";
 import Editor, {EditorHandle} from "./components/Editor";
 import HatSelector from "./components/HatSelector";
 import {Hat} from "./types";
@@ -8,7 +8,107 @@ const App: React.FC = () => {
   const [hatToAdd, setHatToAdd] = useState<Hat | null>(null);
   const [hasImage, setHasImage] = useState(false);
   const [isCopied, setIsCopied] = useState(false);
+  const [isPlaying, setIsPlaying] = useState(false);
   const editorRef = useRef<EditorHandle>(null);
+  const audioRef = useRef<HTMLAudioElement | null>(null);
+
+  // Handle audio play/pause state
+  useEffect(() => {
+    const audio = audioRef.current;
+    if (!audio) {
+      return;
+    }
+
+    const handlePlay = () => {
+      setIsPlaying(true);
+    };
+
+    const handlePause = () => {
+      setIsPlaying(false);
+    };
+
+    const handleError = () => {
+      // Audio error occurred
+    };
+
+    const handleCanPlay = () => {
+      // Audio can play - ready to start
+    };
+
+    const handleLoadedData = () => {
+      // Audio data loaded
+    };
+
+    audio.addEventListener("play", handlePlay);
+    audio.addEventListener("pause", handlePause);
+    audio.addEventListener("error", handleError);
+    audio.addEventListener("canplay", handleCanPlay);
+    audio.addEventListener("loadeddata", handleLoadedData);
+
+    // Multiple attempts to play
+    const ensurePlay = async () => {
+      // Attempt 1: Immediate play
+      try {
+        audio.volume = 0.5; // Set volume to 50%
+        await audio.play();
+        return;
+      } catch (error) {
+        // Autoplay blocked, will try on user interaction
+      }
+
+      // Attempt 2: On any user interaction
+      const playOnInteraction = async () => {
+        try {
+          await audio.play();
+
+          // Remove all listeners once playing
+          document.removeEventListener("click", clickHandler);
+          document.removeEventListener("keydown", keyHandler);
+          document.removeEventListener("touchstart", touchHandler);
+          document.removeEventListener("scroll", scrollHandler);
+        } catch (e) {
+          // Failed to play after user interaction
+        }
+      };
+
+      const clickHandler = () => playOnInteraction();
+      const keyHandler = () => playOnInteraction();
+      const touchHandler = () => playOnInteraction();
+      const scrollHandler = () => playOnInteraction();
+
+      document.addEventListener("click", clickHandler, {once: true});
+      document.addEventListener("keydown", keyHandler, {once: true});
+      document.addEventListener("touchstart", touchHandler, {once: true});
+      document.addEventListener("scroll", scrollHandler, {once: true});
+    };
+
+    // Small delay to ensure DOM is ready
+    setTimeout(ensurePlay, 500);
+
+    return () => {
+      audio.removeEventListener("play", handlePlay);
+      audio.removeEventListener("pause", handlePause);
+      audio.removeEventListener("error", handleError);
+      audio.removeEventListener("canplay", handleCanPlay);
+      audio.removeEventListener("loadeddata", handleLoadedData);
+    };
+  }, []);
+
+  const toggleMusic = async () => {
+    if (audioRef.current) {
+      try {
+        if (isPlaying) {
+          audioRef.current.pause();
+          setIsPlaying(false);
+        } else {
+          await audioRef.current.play();
+          setIsPlaying(true);
+        }
+      } catch (error) {
+        // Toggle error
+      }
+    }
+  };
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files[0] && editorRef.current) {
@@ -27,16 +127,32 @@ const App: React.FC = () => {
   };
 
   return (
-    <div className="min-h-screen w-full bg-white relative font-sans antialiased">
-      {/* Subtle Dotted Background */}
+    <div className="min-h-screen w-full bg-white relative text-gray-800">
+      {/* Crosshatch Art - Light Pattern */}
       <div
-        className="absolute inset-0 z-0 opacity-40"
+        className="absolute inset-0 z-0 pointer-events-none"
         style={{
-          backgroundImage:
-            "radial-gradient(circle at 1px 1px, rgba(0, 0, 0, 0.08) 1px, transparent 0)",
-          backgroundSize: "24px 24px",
+          backgroundImage: `
+            repeating-linear-gradient(22.5deg, transparent, transparent 2px, rgba(75, 85, 99, 0.06) 2px, rgba(75, 85, 99, 0.06) 3px, transparent 3px, transparent 8px),
+            repeating-linear-gradient(67.5deg, transparent, transparent 2px, rgba(107, 114, 128, 0.05) 2px, rgba(107, 114, 128, 0.05) 3px, transparent 3px, transparent 8px),
+            repeating-linear-gradient(112.5deg, transparent, transparent 2px, rgba(55, 65, 81, 0.04) 2px, rgba(55, 65, 81, 0.04) 3px, transparent 3px, transparent 8px),
+            repeating-linear-gradient(157.5deg, transparent, transparent 2px, rgba(31, 41, 55, 0.03) 2px, rgba(31, 41, 55, 0.03) 3px, transparent 3px, transparent 8px)
+          `,
         }}
       />
+
+      {/* Hidden Audio Element */}
+      <audio
+        ref={audioRef}
+        autoPlay
+        loop
+        preload="auto"
+        muted={false}
+        playsInline
+        className="hidden">
+        <source src="/christmas-song.mp3" type="audio/mpeg" />
+        Your browser does not support the audio element.
+      </audio>
 
       {/* Main Content */}
       <div className="relative z-10">
@@ -52,6 +168,23 @@ const App: React.FC = () => {
                   បង្កើតរូបភាពពិសេសរបស់អ្នកសម្រាប់ថ្ងៃបុណ្យណូអែល
                 </p>
               </div>
+              {/* Music Toggle */}
+              <button
+                onClick={toggleMusic}
+                className={`w-10 h-10 rounded-full flex items-center justify-center transition-all ${
+                  isPlaying
+                    ? "bg-red-500 hover:bg-red-600 shadow-lg"
+                    : "bg-gray-100 hover:bg-gray-200 border border-gray-200"
+                }`}
+                title={
+                  isPlaying ? "🎄 Jingle Bells Playing" : "🔔 Play Jingle Bells"
+                }>
+                {isPlaying ? (
+                  <Volume2 className="w-4 h-4 text-white" />
+                ) : (
+                  <VolumeX className="w-4 h-4 text-gray-600" />
+                )}
+              </button>
             </div>
           </div>
         </header>
@@ -123,7 +256,7 @@ const App: React.FC = () => {
                         <Copy className="w-4 h-4" />
                       )}
                       <span className="hidden sm:inline">
-                        {isCopied ? "ចម្លង" : "ចម្លង"}
+                        {isCopied ? "ចម្លងរួច" : "ចម្លង"}
                       </span>
                     </button>
 
@@ -138,27 +271,26 @@ const App: React.FC = () => {
                   </div>
                 </div>
               </div>
-
             </div>
           </div>
         </main>
 
         {/* Footer */}
-        <footer className="border-t border-black/5 mt-16">
-          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-            <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
-              <p className="text-sm text-gray-500">
+        <footer className="border-t border-black/5 mt-16 bg-white">
+          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
+            <div className="flex flex-col sm:flex-row items-center justify-between gap-2">
+              <p className="text-xs text-gray-500">
                 © 2025 KH Christmas Hat Generator
               </p>
               <a
                 href="https://x.com/wolfyxbt"
                 target="_blank"
                 rel="noopener noreferrer"
-                className="inline-flex items-center gap-2 text-sm text-gray-600 hover:text-gray-900 transition-colors group">
+                className="inline-flex items-center gap-2 text-xs text-gray-600 hover:text-gray-900 transition-colors group">
                 <span>Credit to</span>
                 <svg
                   viewBox="0 0 24 24"
-                  className="w-4 h-4 fill-current group-hover:scale-110 transition-transform"
+                  className="w-3.5 h-3.5 fill-current group-hover:scale-110 transition-transform"
                   aria-hidden="true">
                   <path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z" />
                 </svg>

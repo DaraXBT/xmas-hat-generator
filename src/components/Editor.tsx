@@ -711,7 +711,7 @@ const Editor = forwardRef<EditorHandle, EditorProps>(
         draw(true); // Redraw with controls (if any selected)
         return true;
       } catch (err) {
-        console.error("Copy failed", err);
+        // Copy failed
         draw(true);
         return false;
       }
