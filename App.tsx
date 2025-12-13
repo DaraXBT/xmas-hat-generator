@@ -1,4 +1,4 @@
-import React, {useState, useRef} from "react";
+import React, {useState, useRef, useEffect} from "react";
 import {Upload, Download, Copy, Check} from "lucide-react";
 import Editor, {EditorHandle} from "./components/Editor";
 import HatSelector from "./components/HatSelector";
@@ -9,6 +9,33 @@ const App: React.FC = () => {
   const [hasImage, setHasImage] = useState(false);
   const [isCopied, setIsCopied] = useState(false);
   const editorRef = useRef<EditorHandle>(null);
+  const audioRef = useRef<HTMLAudioElement | null>(null);
+
+  // Auto-play Christmas song on mount
+  useEffect(() => {
+    audioRef.current = new Audio("/christmas-song.mp3");
+    audioRef.current.loop = true;
+    audioRef.current.volume = 0.3;
+
+    // Attempt to play (might be blocked by browser autoplay policy)
+    const playPromise = audioRef.current.play();
+
+    if (playPromise !== undefined) {
+      playPromise.catch(() => {
+        // Auto-play was prevented, will play on first user interaction
+        const playOnInteraction = () => {
+          audioRef.current?.play();
+          document.removeEventListener("click", playOnInteraction);
+        };
+        document.addEventListener("click", playOnInteraction);
+      });
+    }
+
+    return () => {
+      audioRef.current?.pause();
+      audioRef.current = null;
+    };
+  }, []);
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files[0] && editorRef.current) {
