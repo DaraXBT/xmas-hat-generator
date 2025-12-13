@@ -27,39 +27,53 @@ const App: React.FC = () => {
   };
 
   return (
-    <div className="min-h-screen bg-[#f5f5f7] font-sans">
-      <div className="max-w-[980px] mx-auto px-6 py-12 md:py-20">
-        <main className="grid grid-cols-1 md:grid-cols-12 gap-12 items-start">
-          {/* Left Column: Editor - Occupies more space */}
-          <div className="md:col-span-8 space-y-8">
-            <Editor
-              ref={editorRef}
-              hatToAdd={hatToAdd}
-              onHatAdded={() => setHatToAdd(null)}
-              onImageStateChange={setHasImage}
-            />
-          </div>
+    <div className="min-h-screen w-full bg-white relative font-sans antialiased">
+      {/* Subtle Dotted Background */}
+      <div
+        className="absolute inset-0 z-0 opacity-40"
+        style={{
+          backgroundImage:
+            "radial-gradient(circle at 1px 1px, rgba(0, 0, 0, 0.08) 1px, transparent 0)",
+          backgroundSize: "24px 24px",
+        }}
+      />
 
-          {/* Right Column: Title & Tools - Sticky on desktop */}
-          <div className="md:col-span-4 space-y-10 md:sticky md:top-24">
-            {/* 1. Header */}
-            <div className="space-y-6">
+      {/* Main Content */}
+      <div className="relative z-10">
+        {/* Header Section */}
+        <header className="border-b border-black/5 bg-white/80 backdrop-blur-xl sticky top-0 z-50">
+          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
+            <div className="flex items-center justify-between">
               <div>
-                <h1 className="text-3xl md:text-4xl font-semibold tracking-tight text-[#1d1d1f] mb-4">
+                <h1 className="text-2xl font-bold tracking-tight text-gray-900">
                   តស់បង្កើតមួកណូអែល
                 </h1>
-                <p className="text-lg md:text-xl leading-relaxed font-medium text-[#1d1d1f]">
-                  <span className="text-[#86868b]">
-                    បង្កើតរូបភាពពិសេសរបស់អ្នកសម្រាប់ថ្ងៃបុណ្យណូអែល។
-                  </span>
+                <p className="mt-1 text-sm text-gray-500">
+                  បង្កើតរូបភាពពិសេសរបស់អ្នកសម្រាប់ថ្ងៃបុណ្យណូអែល
                 </p>
               </div>
             </div>
+          </div>
+        </header>
 
-            {/* 2. Style Selector */}
+        {/* Main Grid Layout */}
+        <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 md:py-12">
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 lg:gap-8">
+            {/* Left: Editor (Takes 2 columns on large screens) */}
+            <div className="lg:col-span-2">
+              <Editor
+                ref={editorRef}
+                hatToAdd={hatToAdd}
+                onHatAdded={() => setHatToAdd(null)}
+                onImageStateChange={setHasImage}
+              />
+            </div>
+
+            {/* Right: Controls Sidebar */}
             <div className="space-y-6">
-              <div>
-                <h2 className="text-2xl font-semibold tracking-tight mb-4">
+              {/* Hat Selector Card */}
+              <div className="bg-white rounded-2xl border border-black/10 p-5 shadow-sm hover:shadow-md transition-shadow">
+                <h2 className="text-lg font-semibold text-gray-900 mb-4">
                   ជ្រើសរើសម៉ូត
                 </h2>
                 <HatSelector
@@ -67,74 +81,92 @@ const App: React.FC = () => {
                   selectedHatId={hatToAdd?.id}
                 />
               </div>
-            </div>
 
-            {/* 3. Actions Module */}
-            <div className="pt-6 border-t border-[#d2d2d7]">
-              <div className="flex flex-col gap-3">
-                <label
-                  className={`w-full py-4 rounded-2xl flex items-center justify-center gap-2 font-medium transition-all cursor-pointer ${
-                    hasImage
-                      ? "bg-[#f5f5f7] hover:bg-[#e8e8ed] text-[#1d1d1f]"
-                      : "bg-[#e5e5e5] text-[#86868b] cursor-not-allowed"
-                  }`}>
-                  <Upload className="w-5 h-5" />
-                  <span>{hasImage ? "ប្តូររូបភាព" : "Upload រូបភាព"}</span>
-                  <input
-                    type="file"
-                    accept="image/*"
-                    onChange={handleFileChange}
-                    className="hidden"
-                  />
-                </label>
+              {/* Actions Card */}
+              <div className="bg-white rounded-2xl border border-black/10 p-5 shadow-sm hover:shadow-md transition-shadow">
+                <h3 className="text-sm font-semibold text-gray-700 mb-4 uppercase tracking-wide">
+                  សកម្មភាព
+                </h3>
 
-                <div className="grid grid-cols-2 gap-3">
-                  <button
-                    onClick={handleCopy}
-                    disabled={!hasImage}
-                    className={`w-full py-4 rounded-2xl font-medium flex items-center justify-center gap-2 transition-all shadow-sm ${
-                      isCopied
-                        ? "bg-[#e5fcf5] text-[#00a368]"
-                        : "bg-white hover:bg-[#fafafa] text-[#1d1d1f] disabled:bg-[#f5f5f7] disabled:text-[#86868b] disabled:cursor-not-allowed border border-[#d2d2d7] hover:border-[#86868b]"
+                <div className="space-y-3">
+                  {/* Upload Button */}
+                  <label
+                    className={`group relative w-full py-3.5 px-4 rounded-xl flex items-center justify-center gap-2 text-sm font-medium transition-all cursor-pointer overflow-hidden ${
+                      hasImage
+                        ? "bg-gray-50 hover:bg-gray-100 text-gray-900 border border-gray-200"
+                        : "bg-gray-100 text-gray-400 cursor-not-allowed border border-gray-200"
                     }`}>
-                    {isCopied ? (
-                      <Check className="w-5 h-5" />
-                    ) : (
-                      <Copy className="w-5 h-5" />
-                    )}
-                    {isCopied ? "ចម្លងរួចរាល់" : "ចម្លងរូបភាព"}
-                  </button>
+                    <Upload className="w-4 h-4" />
+                    <span>{hasImage ? "ប្តូររូបភាព" : "Upload រូបភាព"}</span>
+                    <input
+                      type="file"
+                      accept="image/*"
+                      onChange={handleFileChange}
+                      className="hidden"
+                    />
+                  </label>
 
-                  <button
-                    onClick={() => editorRef.current?.download()}
-                    disabled={!hasImage}
-                    className="w-full py-4 bg-[#0071e3] hover:bg-[#0077ed] disabled:opacity-30 disabled:cursor-not-allowed text-white rounded-2xl font-medium flex items-center justify-center gap-2 transition-all shadow-sm">
-                    <Download className="w-5 h-5" />
-                    រក្សាទុករូបភាព
-                  </button>
+                  {/* Action Buttons */}
+                  <div className="grid grid-cols-2 gap-3">
+                    {/* Copy Button */}
+                    <button
+                      onClick={handleCopy}
+                      disabled={!hasImage}
+                      className={`py-3.5 px-4 rounded-xl text-sm font-medium flex items-center justify-center gap-2 transition-all ${
+                        isCopied
+                          ? "bg-emerald-50 text-emerald-700 border border-emerald-200"
+                          : "bg-white hover:bg-gray-50 text-gray-900 disabled:bg-gray-50 disabled:text-gray-400 disabled:cursor-not-allowed border border-gray-200 hover:border-gray-300"
+                      }`}>
+                      {isCopied ? (
+                        <Check className="w-4 h-4" />
+                      ) : (
+                        <Copy className="w-4 h-4" />
+                      )}
+                      <span className="hidden sm:inline">
+                        {isCopied ? "ចម្លង" : "ចម្លង"}
+                      </span>
+                    </button>
+
+                    {/* Download Button */}
+                    <button
+                      onClick={() => editorRef.current?.download()}
+                      disabled={!hasImage}
+                      className="py-3.5 px-4 bg-gray-900 hover:bg-gray-800 disabled:opacity-40 disabled:cursor-not-allowed text-white rounded-xl text-sm font-medium flex items-center justify-center gap-2 transition-all">
+                      <Download className="w-4 h-4" />
+                      <span className="hidden sm:inline">រក្សាទុក</span>
+                    </button>
+                  </div>
                 </div>
               </div>
+
             </div>
           </div>
         </main>
 
-        {/* Credit Footer */}
-        <div className="mt-12 text-center">
-          <a
-            href="https://x.com/wolfyxbt"
-            target="_blank"
-            rel="noopener noreferrer"
-            className="inline-flex items-center gap-1.5 text-xs text-[#86868b] hover:text-[#1d1d1f] transition-colors">
-            <span>Credit to</span>
-            <svg
-              viewBox="0 0 24 24"
-              className="w-3 h-3 fill-current"
-              aria-hidden="true">
-              <path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z" />
-            </svg>
-            <span className="font-medium">@wolfyxbt</span>
-          </a>
-        </div>
+        {/* Footer */}
+        <footer className="border-t border-black/5 mt-16">
+          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+            <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
+              <p className="text-sm text-gray-500">
+                © 2025 KH Christmas Hat Generator
+              </p>
+              <a
+                href="https://x.com/wolfyxbt"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex items-center gap-2 text-sm text-gray-600 hover:text-gray-900 transition-colors group">
+                <span>Credit to</span>
+                <svg
+                  viewBox="0 0 24 24"
+                  className="w-4 h-4 fill-current group-hover:scale-110 transition-transform"
+                  aria-hidden="true">
+                  <path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z" />
+                </svg>
+                <span className="font-semibold">@wolfyxbt</span>
+              </a>
+            </div>
+          </div>
+        </footer>
       </div>
     </div>
   );
