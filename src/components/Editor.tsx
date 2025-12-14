@@ -6,7 +6,7 @@ import React, {
   useImperativeHandle,
   forwardRef,
 } from "react";
-import {Upload} from "lucide-react";
+import {Upload, Camera, X, FlipHorizontal, Repeat} from "lucide-react";
 import {Hat, PlacedHat} from "../types";
 
 export interface EditorHandle {
@@ -40,8 +40,21 @@ const Editor = forwardRef<EditorHandle, EditorProps>(
       Record<string, HTMLImageElement>
     >({});
     const [isDragging, setIsDragging] = useState(false);
+    const [isCameraOpen, setIsCameraOpen] = useState(false);
+    const [facingMode, setFacingMode] = useState<"user" | "environment">(
+      "user"
+    );
+    const [isMirrored, setIsMirrored] = useState(true); // Toggle for mirror effect
+    const [capturedPhoto, setCapturedPhoto] = useState<string | null>(null); // Store captured photo preview
+    const videoRef = useRef<HTMLVideoElement>(null);
+    const streamRef = useRef<MediaStream | null>(null);
+    const cameraCanvasRef = useRef<HTMLCanvasElement>(null);
+    const [cameraHats, setCameraHats] = useState<PlacedHat[]>([]);
+    const [selectedCameraHatId, setSelectedCameraHatId] = useState<
+      string | null
+    >(null);
 
-    // Interaction State
+    // Interaction State (shared for both regular and camera mode)
     const [mode, setMode] = useState<Mode>("NONE");
     const [startInteraction, setStartInteraction] = useState({
       mouseX: 0,
@@ -140,6 +153,503 @@ const Editor = forwardRef<EditorHandle, EditorProps>(
       }
     };
 
+    // Camera Functions
+    const openCamera = useCallback(async () => {
+      try {
+        const stream = await navigator.mediaDevices.getUserMedia({
+          video: {
+            facingMode: facingMode,
+            width: {ideal: 1280},
+            height: {ideal: 720},
+          },
+          audio: false,
+        });
+        streamRef.current = stream;
+        setIsCameraOpen(true);
+
+        // Wait for video element to be ready
+        setTimeout(() => {
+          if (videoRef.current) {
+            videoRef.current.srcObject = stream;
+          }
+        }, 100);
+      } catch (error) {
+        console.error("Error accessing camera:", error);
+        alert("មិនអាចចូលប្រើកាមេរ៉ាបានទេ។ សូមពិនិត្យមើលការអនុញ្ញាត។");
+      }
+    }, [facingMode]);
+
+    const flipCamera = useCallback(async () => {
+      closeCamera();
+      setFacingMode((prev) => (prev === "user" ? "environment" : "user"));
+      // Reopen camera will be triggered by useEffect
+    }, []);
+
+    // Reopen camera when facingMode changes
+    useEffect(() => {
+      if (isCameraOpen && !streamRef.current) {
+        openCamera();
+      }
+    }, [facingMode, isCameraOpen, openCamera]);
+
+    const closeCamera = useCallback(() => {
+      if (streamRef.current) {
+        streamRef.current.getTracks().forEach((track) => track.stop());
+        streamRef.current = null;
+      }
+      setIsCameraOpen(false);
+      setCameraHats([]);
+      setCapturedPhoto(null);
+    }, []);
+
+    const capturePhoto = useCallback(() => {
+      if (!cameraCanvasRef.current) return;
+
+      const sourceCanvas = cameraCanvasRef.current;
+
+      // Convert canvas to data URL for preview
+      const photoDataUrl = sourceCanvas.toDataURL("image/jpeg", 0.95);
+      setCapturedPhoto(photoDataUrl);
+    }, []);
+
+    const retakePhoto = useCallback(() => {
+      setCapturedPhoto(null);
+      setCameraHats([]);
+      setSelectedCameraHatId(null);
+    }, []);
+
+    const usePhoto = useCallback(() => {
+      if (!capturedPhoto) return;
+
+      // Convert data URL to blob and process as file
+      fetch(capturedPhoto)
+        .then((res) => res.blob())
+        .then((blob) => {
+          const file = new File([blob], "camera-photo.jpg", {
+            type: "image/jpeg",
+          });
+          processFile(file);
+
+          // Transfer camera hats to main editor with the exact same positions
+          setHats(cameraHats);
+          closeCamera();
+          setCapturedPhoto(null);
+        });
+    }, [capturedPhoto, processFile, closeCamera, cameraHats]);
+
+    // Draw camera preview with hats in real-time
+    const drawCameraPreview = useCallback(() => {
+      const canvas = cameraCanvasRef.current;
+      const video = videoRef.current;
+
+      if (!canvas || !video || !isCameraOpen) return;
+
+      const ctx = canvas.getContext("2d");
+      if (!ctx) return;
+
+      // Set canvas size to match video
+      if (
+        canvas.width !== video.videoWidth ||
+        canvas.height !== video.videoHeight
+      ) {
+        canvas.width = video.videoWidth;
+        canvas.height = video.videoHeight;
+      }
+
+      // Draw video frame
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+      // Mirror the video based on isMirrored state
+      if (isMirrored) {
+        ctx.save();
+        ctx.scale(-1, 1);
+        ctx.drawImage(video, -canvas.width, 0, canvas.width, canvas.height);
+        ctx.restore();
+      } else {
+        ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+      }
+
+      // Draw hats on top
+      cameraHats.forEach((hat) => {
+        const hatImg = loadedImages[hat.src];
+        if (!hatImg) return;
+
+        ctx.save();
+
+        // If mirrored, mirror the hat positions as well
+        let hatX = hat.x;
+        if (isMirrored) {
+          hatX = canvas.width - hat.x;
+        }
+
+        ctx.translate(hatX, hat.y);
+        ctx.rotate((hat.rotation * Math.PI) / 180);
+        ctx.scale(hat.isMirrored ? -1 : 1, 1);
+
+        const w = hatImg.width * hat.scale;
+        const h = hatImg.height * hat.scale;
+
+        ctx.drawImage(hatImg, -w / 2, -h / 2, w, h);
+        ctx.restore();
+      });
+
+      // Draw controls for selected hat
+      if (selectedCameraHatId) {
+        const selectedHat = cameraHats.find(
+          (h) => h.uid === selectedCameraHatId
+        );
+        if (selectedHat) {
+          const hatImg = loadedImages[selectedHat.src];
+          if (hatImg) {
+            // Calculate UI scale based on canvas resolution
+            const rect = canvas.getBoundingClientRect();
+            const uiScale = rect.width > 0 ? canvas.width / rect.width : 1;
+
+            const w = hatImg.width * selectedHat.scale;
+            const h = hatImg.height * selectedHat.scale;
+            const rad = (selectedHat.rotation * Math.PI) / 180;
+            const cos = Math.cos(rad);
+            const sin = Math.sin(rad);
+
+            // Adjust center position for mirroring
+            let cx = selectedHat.x;
+            if (isMirrored) {
+              cx = canvas.width - selectedHat.x;
+            }
+            const cy = selectedHat.y;
+
+            // Helper to rotate point
+            const rotatePoint = (px: number, py: number) => ({
+              x: px * cos - py * sin + cx,
+              y: px * sin + py * cos + cy,
+            });
+
+            const tr = rotatePoint(w / 2, -h / 2);
+            const br = rotatePoint(w / 2, h / 2);
+            const bl = rotatePoint(-w / 2, h / 2);
+            const tl = rotatePoint(-w / 2, -h / 2);
+
+            // Draw bounding box
+            ctx.strokeStyle = "#0071e3";
+            ctx.lineWidth = 2 * uiScale;
+            ctx.setLineDash([5 * uiScale, 5 * uiScale]);
+            ctx.beginPath();
+            ctx.moveTo(tl.x, tl.y);
+            ctx.lineTo(tr.x, tr.y);
+            ctx.lineTo(br.x, br.y);
+            ctx.lineTo(bl.x, bl.y);
+            ctx.closePath();
+            ctx.stroke();
+            ctx.setLineDash([]);
+
+            // Draw handles using the existing drawHandle helper
+            // We'll use a simpler inline version for camera mode
+            const drawCameraHandle = (x: number, y: number) => {
+              const radius = BASE_HANDLE_RADIUS * uiScale;
+
+              ctx.save();
+              ctx.shadowColor = "rgba(0, 0, 0, 0.15)";
+              ctx.shadowBlur = 4 * uiScale;
+              ctx.shadowOffsetY = 2 * uiScale;
+
+              ctx.beginPath();
+              ctx.arc(x, y, radius, 0, Math.PI * 2);
+              ctx.fillStyle = "#ffffff";
+              ctx.fill();
+
+              ctx.shadowColor = "transparent";
+              ctx.strokeStyle = "#e5e5e5";
+              ctx.lineWidth = 1 * uiScale;
+              ctx.stroke();
+              ctx.restore();
+            };
+
+            drawCameraHandle(tl.x, tl.y); // Top-left - rotate
+            drawCameraHandle(tr.x, tr.y); // Top-right - delete
+            drawCameraHandle(br.x, br.y); // Bottom-right - scale
+            drawCameraHandle(bl.x, bl.y); // Bottom-left - flip
+          }
+        }
+      }
+
+      // Continue animation
+      requestAnimationFrame(drawCameraPreview);
+    }, [
+      isCameraOpen,
+      cameraHats,
+      loadedImages,
+      isMirrored,
+      selectedCameraHatId,
+      BASE_HANDLE_RADIUS,
+    ]);
+
+    // Start camera preview loop when camera opens
+    useEffect(() => {
+      if (isCameraOpen && videoRef.current) {
+        const checkVideoReady = () => {
+          if (videoRef.current && videoRef.current.readyState >= 2) {
+            drawCameraPreview();
+          } else {
+            setTimeout(checkVideoReady, 100);
+          }
+        };
+        checkVideoReady();
+      }
+    }, [isCameraOpen, drawCameraPreview]);
+
+    // Camera interaction handlers
+    const getCameraCanvasCoords = (e: React.MouseEvent | React.TouchEvent) => {
+      const canvas = cameraCanvasRef.current;
+      if (!canvas) return {x: 0, y: 0};
+
+      const rect = canvas.getBoundingClientRect();
+      let clientX: number, clientY: number;
+
+      if ("touches" in e) {
+        if (e.touches.length === 0) return {x: 0, y: 0};
+        clientX = e.touches[0].clientX;
+        clientY = e.touches[0].clientY;
+      } else {
+        clientX = e.clientX;
+        clientY = e.clientY;
+      }
+
+      const scaleX = canvas.width / rect.width;
+      const scaleY = canvas.height / rect.height;
+
+      return {
+        x: (clientX - rect.left) * scaleX,
+        y: (clientY - rect.top) * scaleY,
+      };
+    };
+
+    const getCameraTransformedCorners = (hat: PlacedHat) => {
+      const img = loadedImages[hat.src];
+      const canvas = cameraCanvasRef.current;
+      if (!img || !canvas) return null;
+
+      const w = img.width * hat.scale;
+      const h = img.height * hat.scale;
+      const rad = (hat.rotation * Math.PI) / 180;
+      const cos = Math.cos(rad);
+      const sin = Math.sin(rad);
+
+      // Adjust for mirroring
+      let cx = hat.x;
+      if (isMirrored) {
+        cx = canvas.width - hat.x;
+      }
+      const cy = hat.y;
+
+      const rotatePoint = (px: number, py: number) => ({
+        x: px * cos - py * sin + cx,
+        y: px * sin + py * cos + cy,
+      });
+
+      const tr = rotatePoint(w / 2, -h / 2);
+      const br = rotatePoint(w / 2, h / 2);
+      const bl = rotatePoint(-w / 2, h / 2);
+      const tl = rotatePoint(-w / 2, -h / 2);
+
+      return {tl, tr, br, bl, width: w, height: h};
+    };
+
+    const handleCameraMouseDown = (e: React.MouseEvent | React.TouchEvent) => {
+      if (!isCameraOpen) return;
+      const {x, y} = getCameraCanvasCoords(e);
+      const canvas = cameraCanvasRef.current;
+      if (!canvas) return;
+
+      const rect = canvas.getBoundingClientRect();
+      const uiScale = rect.width > 0 ? canvas.width / rect.width : 1;
+      const hitRadius = BASE_HANDLE_RADIUS * uiScale * 1.5;
+
+      // Check controls of selected hat
+      if (selectedCameraHatId) {
+        const hat = cameraHats.find((h) => h.uid === selectedCameraHatId);
+        if (hat) {
+          const corners = getCameraTransformedCorners(hat);
+          if (corners) {
+            // Delete (TR)
+            if (isPointInCircle(x, y, corners.tr.x, corners.tr.y, hitRadius)) {
+              setCameraHats((prev) =>
+                prev.filter((h) => h.uid !== selectedCameraHatId)
+              );
+              setSelectedCameraHatId(null);
+              return;
+            }
+            // Rotate (TL)
+            if (isPointInCircle(x, y, corners.tl.x, corners.tl.y, hitRadius)) {
+              setMode("ROTATE");
+              setStartInteraction({
+                mouseX: x,
+                mouseY: y,
+                startRotation: hat.rotation,
+                startScale: hat.scale,
+                startX: hat.x,
+                startY: hat.y,
+              });
+              return;
+            }
+            // Scale (BR)
+            if (isPointInCircle(x, y, corners.br.x, corners.br.y, hitRadius)) {
+              setMode("SCALE");
+              setStartInteraction({
+                mouseX: x,
+                mouseY: y,
+                startRotation: hat.rotation,
+                startScale: hat.scale,
+                startX: hat.x,
+                startY: hat.y,
+              });
+              return;
+            }
+            // Flip (BL)
+            if (isPointInCircle(x, y, corners.bl.x, corners.bl.y, hitRadius)) {
+              setCameraHats((prev) =>
+                prev.map((h) =>
+                  h.uid === selectedCameraHatId
+                    ? {...h, isMirrored: !h.isMirrored}
+                    : h
+                )
+              );
+              return;
+            }
+          }
+        }
+      }
+
+      // Check if clicking on any hat
+      for (let i = cameraHats.length - 1; i >= 0; i--) {
+        const hat = cameraHats[i];
+        const img = loadedImages[hat.src];
+        if (!img) continue;
+
+        let hatX = hat.x;
+        if (isMirrored) {
+          hatX = canvas.width - hat.x;
+        }
+
+        const w = img.width * hat.scale;
+        const h = img.height * hat.scale;
+
+        const dx = x - hatX;
+        const dy = y - hat.y;
+        const rad = (hat.rotation * Math.PI) / 180;
+        const cos = Math.cos(rad);
+        const sin = Math.sin(rad);
+        const localX = dx * cos + dy * sin;
+        const localY = -dx * sin + dy * cos;
+
+        if (Math.abs(localX) <= w / 2 && Math.abs(localY) <= h / 2) {
+          setSelectedCameraHatId(hat.uid);
+          setMode("DRAG");
+          setStartInteraction({
+            mouseX: x,
+            mouseY: y,
+            startRotation: hat.rotation,
+            startScale: hat.scale,
+            startX: hat.x,
+            startY: hat.y,
+          });
+          return;
+        }
+      }
+
+      // Clicked on empty area
+      setSelectedCameraHatId(null);
+    };
+
+    const handleCameraMouseMove = (e: React.MouseEvent | React.TouchEvent) => {
+      if (!isCameraOpen || mode === "NONE") return;
+
+      const {x, y} = getCameraCanvasCoords(e);
+      const canvas = cameraCanvasRef.current;
+      if (!canvas || !selectedCameraHatId) return;
+
+      if (mode === "DRAG") {
+        const dx = x - startInteraction.mouseX;
+        const dy = y - startInteraction.mouseY;
+
+        setCameraHats((prev) =>
+          prev.map((h) =>
+            h.uid === selectedCameraHatId
+              ? {
+                  ...h,
+                  x: startInteraction.startX + dx,
+                  y: startInteraction.startY + dy,
+                }
+              : h
+          )
+        );
+      } else if (mode === "ROTATE") {
+        const hat = cameraHats.find((h) => h.uid === selectedCameraHatId);
+        if (!hat) return;
+
+        let cx = hat.x;
+        if (isMirrored) {
+          cx = canvas.width - hat.x;
+        }
+
+        const startAngle = Math.atan2(
+          startInteraction.mouseY - hat.y,
+          startInteraction.mouseX - cx
+        );
+        const currentAngle = Math.atan2(y - hat.y, x - cx);
+        const deltaAngle = ((currentAngle - startAngle) * 180) / Math.PI;
+
+        setCameraHats((prev) =>
+          prev.map((h) =>
+            h.uid === selectedCameraHatId
+              ? {...h, rotation: startInteraction.startRotation + deltaAngle}
+              : h
+          )
+        );
+      } else if (mode === "SCALE") {
+        const hat = cameraHats.find((h) => h.uid === selectedCameraHatId);
+        if (!hat) return;
+
+        let cx = hat.x;
+        if (isMirrored) {
+          cx = canvas.width - hat.x;
+        }
+
+        const startDist = Math.hypot(
+          startInteraction.mouseX - cx,
+          startInteraction.mouseY - hat.y
+        );
+        const currentDist = Math.hypot(x - cx, y - hat.y);
+        const scaleFactor = currentDist / startDist;
+
+        setCameraHats((prev) =>
+          prev.map((h) =>
+            h.uid === selectedCameraHatId
+              ? {
+                  ...h,
+                  scale: Math.max(
+                    0.1,
+                    startInteraction.startScale * scaleFactor
+                  ),
+                }
+              : h
+          )
+        );
+      }
+    };
+
+    const handleCameraMouseUp = () => {
+      setMode("NONE");
+    };
+
+    // Cleanup camera on unmount
+    useEffect(() => {
+      return () => {
+        if (streamRef.current) {
+          streamRef.current.getTracks().forEach((track) => track.stop());
+        }
+      };
+    }, []);
+
     // Preload hat image helper
     const loadHatImage = (src: string): Promise<HTMLImageElement> => {
       return new Promise((resolve, reject) => {
@@ -168,9 +678,30 @@ const Editor = forwardRef<EditorHandle, EditorProps>(
           let initialX = 400;
           let initialY = 300;
 
-          if (image) {
-            // Use the High-Res Canvas Dimensions for positioning logic
-            const {width: cvsW, height: cvsH} = getRenderDimensions(image);
+          // Check if we're in camera mode or regular mode
+          const targetCanvas = isCameraOpen ? cameraCanvasRef.current : null;
+          const targetImage = image;
+
+          if (isCameraOpen && targetCanvas) {
+            // Camera mode: use video dimensions
+            const cvsW = targetCanvas.width || 1280;
+            const cvsH = targetCanvas.height || 720;
+
+            const targetWidth = cvsW * 0.35;
+            initialScale = targetWidth / img.width;
+
+            initialX = cvsW / 2;
+            initialY = cvsH / 3;
+
+            // Slight offset if adding multiple to avoid perfect overlap
+            if (cameraHats.length > 0) {
+              initialX += (Math.random() - 0.5) * 40;
+              initialY += (Math.random() - 0.5) * 40;
+            }
+          } else if (targetImage) {
+            // Regular mode: Use the High-Res Canvas Dimensions for positioning logic
+            const {width: cvsW, height: cvsH} =
+              getRenderDimensions(targetImage);
 
             // Calculate target width relative to background (e.g. 35%)
             const targetWidth = cvsW * 0.35;
@@ -198,12 +729,24 @@ const Editor = forwardRef<EditorHandle, EditorProps>(
             isMirrored: false,
           };
 
-          setHats((prev) => [...prev, newHat]);
-          setSelectedHatId(newUid);
+          if (isCameraOpen) {
+            setCameraHats((prev) => [...prev, newHat]);
+          } else {
+            setHats((prev) => [...prev, newHat]);
+            setSelectedHatId(newUid);
+          }
           onHatAdded(); // Notify parent
         });
       }
-    }, [hatToAdd, image, hats, onHatAdded, getRenderDimensions]);
+    }, [
+      hatToAdd,
+      image,
+      hats,
+      cameraHats,
+      isCameraOpen,
+      onHatAdded,
+      getRenderDimensions,
+    ]);
 
     // Helper to get screen coordinates of corners for a specific hat
     const getTransformedCorners = useCallback(
@@ -737,67 +1280,205 @@ const Editor = forwardRef<EditorHandle, EditorProps>(
               ? "border-[#0071e3] ring-4 ring-[#0071e3]/10 bg-[#f5f5f7]"
               : "border-[#d2d2d7] bg-white"
           }`}>
-          <canvas
-            ref={canvasRef}
-            onMouseDown={handleMouseDown}
-            onMouseMove={handleMouseMove}
-            onMouseUp={handleMouseUp}
-            onMouseLeave={handleMouseUp}
-            onTouchStart={handleMouseDown}
-            onTouchMove={handleMouseMove}
-            onTouchEnd={handleMouseUp}
-            className={`max-w-full max-h-[70vh] object-contain w-full h-auto block ${
-              !image ? "pointer-events-none" : "cursor-default"
-            }`}
-            style={{
-              cursor:
-                mode === "DRAG"
-                  ? "move"
-                  : mode === "ROTATE"
-                  ? "crosshair"
-                  : mode === "SCALE"
-                  ? "nwse-resize"
-                  : !image
-                  ? "default"
-                  : "default",
-            }}
-          />
+          {/* Camera View - Inline */}
+          {isCameraOpen ? (
+            <>
+              {capturedPhoto ? (
+                /* Photo Preview Mode */
+                <>
+                  <img
+                    src={capturedPhoto}
+                    alt="Captured"
+                    className="max-w-full max-h-[70vh] object-contain w-full h-auto block"
+                  />
 
-          {!image && (
-            <div
-              className={`absolute inset-0 flex flex-col items-center justify-center pointer-events-none transition-opacity duration-200 ${
-                isDragging ? "opacity-50" : "opacity-100"
-              }`}>
-              <div className="text-[#86868b] text-center">
-                <p className="text-lg font-medium">មិនទាន់បានជ្រើសរើសរូបភាព</p>
-                <p className="text-sm text-[#86868b]/70 mt-2">
-                  អូសរូបភាពចូល ឬ Ctrl+V ដើម្បីដាក់បញ្ចូលរូបភាព
-                </p>
-              </div>
-              <div
-                className="mt-4 px-6 py-3 bg-[#1d1d1f] text-white rounded-full font-medium text-sm flex items-center gap-2 pointer-events-auto cursor-pointer shadow-lg hover:scale-105 transition-transform"
-                onClick={() => document.getElementById("file-upload")?.click()}>
-                <Upload className="w-4 h-4" />
-                Upload រូបភាព
-              </div>
-              <input
-                id="file-upload"
-                type="file"
-                accept="image/*"
-                onChange={handleImageUpload}
-                className="hidden"
+                  {/* Preview Controls */}
+                  <div className="absolute top-4 right-4 z-10">
+                    <button
+                      onClick={closeCamera}
+                      className="bg-white/90 backdrop-blur-sm rounded-full p-3 hover:bg-white transition-colors shadow-lg">
+                      <X className="w-5 h-5 text-gray-800" />
+                    </button>
+                  </div>
+
+                  {/* Action Buttons */}
+                  <div className="absolute bottom-4 left-1/2 transform -translate-x-1/2 flex gap-3 z-10">
+                    <button
+                      onClick={retakePhoto}
+                      className="px-8 py-3 bg-gray-200 text-gray-800 rounded-full font-medium text-base hover:bg-gray-300 hover:scale-105 transition-all shadow-lg">
+                      ថតម្តងទៀត
+                    </button>
+                    <button
+                      onClick={usePhoto}
+                      className="px-8 py-3 bg-[#0071e3] text-white rounded-full font-medium text-base flex items-center gap-2 shadow-2xl hover:bg-[#0077ed] hover:scale-105 transition-all">
+                      <Camera className="w-5 h-5" />
+                      ប្រើរូបនេះ
+                    </button>
+                  </div>
+                </>
+              ) : (
+                /* Live Camera Mode */
+                <>
+                  {/* Hidden video element for camera stream */}
+                  <video
+                    ref={videoRef}
+                    autoPlay
+                    playsInline
+                    className="hidden"
+                  />
+                  {/* Canvas for preview with hats */}
+                  <canvas
+                    ref={cameraCanvasRef}
+                    onMouseDown={handleCameraMouseDown}
+                    onMouseMove={handleCameraMouseMove}
+                    onMouseUp={handleCameraMouseUp}
+                    onMouseLeave={handleCameraMouseUp}
+                    onTouchStart={handleCameraMouseDown}
+                    onTouchMove={handleCameraMouseMove}
+                    onTouchEnd={handleCameraMouseUp}
+                    className="max-w-full max-h-[70vh] object-contain w-full h-auto block cursor-default"
+                  />
+
+                  {/* Camera Controls Overlay */}
+                  <div className="absolute top-4 left-4 right-4 flex justify-between items-start z-10">
+                    <div className="flex gap-2">
+                      <button
+                        onClick={flipCamera}
+                        className="bg-white/90 backdrop-blur-sm rounded-full p-3 hover:bg-white transition-colors shadow-lg"
+                        title="Switch Camera">
+                        <FlipHorizontal className="w-5 h-5 text-gray-800" />
+                      </button>
+                      <button
+                        onClick={() => setIsMirrored(!isMirrored)}
+                        className={`backdrop-blur-sm rounded-full p-3 transition-colors shadow-lg ${
+                          isMirrored
+                            ? "bg-[#0071e3] text-white hover:bg-[#0077ed]"
+                            : "bg-white/90 text-gray-800 hover:bg-white"
+                        }`}
+                        title={
+                          isMirrored
+                            ? "Mirrored (Click to disable)"
+                            : "Normal (Click to mirror)"
+                        }>
+                        <Repeat className="w-5 h-5" />
+                      </button>
+                    </div>
+                    <button
+                      onClick={closeCamera}
+                      className="bg-white/90 backdrop-blur-sm rounded-full p-3 hover:bg-white transition-colors shadow-lg">
+                      <X className="w-5 h-5 text-gray-800" />
+                    </button>
+                  </div>
+
+                  {/* Hat Counter */}
+                  <div className="absolute bottom-20 left-1/2 transform -translate-x-1/2 bg-black/50 backdrop-blur-sm text-white px-4 py-2 rounded-full text-sm z-10">
+                    {cameraHats.length > 0
+                      ? `${cameraHats.length} មួក`
+                      : "ជ្រើសរើសមួកពីខាងក្រោម"}
+                  </div>
+
+                  {/* Capture Button */}
+                  <div className="absolute bottom-4 left-1/2 transform -translate-x-1/2 z-10">
+                    <button
+                      onClick={capturePhoto}
+                      disabled={!cameraCanvasRef.current}
+                      className="px-8 py-3 bg-[#0071e3] text-white rounded-full font-medium text-base flex items-center gap-2 shadow-2xl hover:bg-[#0077ed] hover:scale-105 transition-all disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100">
+                      <Camera className="w-5 h-5" />
+                      ថតរូប
+                    </button>
+                  </div>
+                </>
+              )}
+            </>
+          ) : (
+            <>
+              {/* Regular Editor Canvas */}
+              <canvas
+                ref={canvasRef}
+                onMouseDown={handleMouseDown}
+                onMouseMove={handleMouseMove}
+                onMouseUp={handleMouseUp}
+                onMouseLeave={handleMouseUp}
+                onTouchStart={handleMouseDown}
+                onTouchMove={handleMouseMove}
+                onTouchEnd={handleMouseUp}
+                className={`max-w-full max-h-[70vh] object-contain w-full h-auto block ${
+                  !image ? "pointer-events-none" : "cursor-default"
+                }`}
+                style={{
+                  cursor:
+                    mode === "DRAG"
+                      ? "move"
+                      : mode === "ROTATE"
+                      ? "crosshair"
+                      : mode === "SCALE"
+                      ? "nwse-resize"
+                      : !image
+                      ? "default"
+                      : "default",
+                }}
               />
-            </div>
-          )}
 
-          {/* Visual feedback overlay for Drag & Drop */}
-          {isDragging && (
-            <div className="absolute inset-0 flex items-center justify-center bg-white/60 backdrop-blur-sm z-50 pointer-events-none border-4 border-dashed border-[#0071e3] rounded-3xl m-2">
-              <div className="bg-[#0071e3] text-white px-6 py-3 rounded-full font-medium shadow-lg flex items-center gap-2 animate-bounce">
-                <Upload className="w-5 h-5" />
-                ទម្លាក់ដើម្បីបន្ថែមរូបភាព
-              </div>
-            </div>
+              {image && (
+                <div className="absolute bottom-4 left-1/2 transform -translate-x-1/2 z-10 pointer-events-auto">
+                  <button
+                    onClick={openCamera}
+                    className="px-6 py-3 bg-[#0071e3] text-white rounded-full font-medium text-sm flex items-center gap-2 cursor-pointer shadow-lg hover:scale-105 transition-transform">
+                    <Camera className="w-4 h-4" />
+                    ថតរូបម្តងទៀត
+                  </button>
+                </div>
+              )}
+
+              {!image && (
+                <div
+                  className={`absolute inset-0 flex flex-col items-center justify-center pointer-events-none transition-opacity duration-200 ${
+                    isDragging ? "opacity-50" : "opacity-100"
+                  }`}>
+                  <div className="text-[#86868b] text-center">
+                    <p className="text-lg font-medium">
+                      មិនទាន់បានជ្រើសរើសរូបភាព
+                    </p>
+                    <p className="text-sm text-[#86868b]/70 mt-2">
+                      អូសរូបភាពចូល ឬ Ctrl+V ដើម្បីដាក់បញ្ចូលរូបភាព
+                    </p>
+                  </div>
+                  <div className="flex items-center gap-3 mt-4 pointer-events-auto">
+                    <div
+                      className="px-6 py-3 bg-[#1d1d1f] text-white rounded-full font-medium text-sm flex items-center gap-2 cursor-pointer shadow-lg hover:scale-105 transition-transform"
+                      onClick={() =>
+                        document.getElementById("file-upload")?.click()
+                      }>
+                      <Upload className="w-4 h-4" />
+                      Upload រូបភាព
+                    </div>
+                    <div
+                      className="px-6 py-3 bg-[#0071e3] text-white rounded-full font-medium text-sm flex items-center gap-2 cursor-pointer shadow-lg hover:scale-105 transition-transform"
+                      onClick={openCamera}>
+                      <Camera className="w-4 h-4" />
+                      ថតរូប
+                    </div>
+                  </div>
+                  <input
+                    id="file-upload"
+                    type="file"
+                    accept="image/*"
+                    onChange={handleImageUpload}
+                    className="hidden"
+                  />
+                </div>
+              )}
+
+              {/* Visual feedback overlay for Drag & Drop */}
+              {isDragging && (
+                <div className="absolute inset-0 flex items-center justify-center bg-white/60 backdrop-blur-sm z-50 pointer-events-none border-4 border-dashed border-[#0071e3] rounded-3xl m-2">
+                  <div className="bg-[#0071e3] text-white px-6 py-3 rounded-full font-medium shadow-lg flex items-center gap-2 animate-bounce">
+                    <Upload className="w-5 h-5" />
+                    ទម្លាក់ដើម្បីបន្ថែមរូបភាព
+                  </div>
+                </div>
+              )}
+            </>
           )}
         </div>
       </div>
