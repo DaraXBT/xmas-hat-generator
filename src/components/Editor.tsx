@@ -342,10 +342,14 @@ const Editor = forwardRef<EditorHandle, EditorProps>(
             ctx.stroke();
             ctx.setLineDash([]);
 
-            // Draw handles using the existing drawHandle helper
-            // We'll use a simpler inline version for camera mode
-            const drawCameraHandle = (x: number, y: number) => {
+            // Draw handles with icons for camera mode
+            const drawCameraHandle = (
+              x: number,
+              y: number,
+              type: "flip" | "rotate" | "scale" | "delete"
+            ) => {
               const radius = BASE_HANDLE_RADIUS * uiScale;
+              const iconSize = radius * 0.5;
 
               ctx.save();
               ctx.shadowColor = "rgba(0, 0, 0, 0.15)";
@@ -354,20 +358,86 @@ const Editor = forwardRef<EditorHandle, EditorProps>(
 
               ctx.beginPath();
               ctx.arc(x, y, radius, 0, Math.PI * 2);
-              ctx.fillStyle = "#ffffff";
+              ctx.fillStyle = type === "delete" ? "#ff3b30" : "#ffffff";
               ctx.fill();
 
               ctx.shadowColor = "transparent";
-              ctx.strokeStyle = "#e5e5e5";
+              ctx.strokeStyle = type === "delete" ? "#ff3b30" : "#e5e5e5";
               ctx.lineWidth = 1 * uiScale;
               ctx.stroke();
+
+              // Draw icon
+              ctx.translate(x, y);
+              ctx.strokeStyle = type === "delete" ? "#ffffff" : "#0071e3";
+              ctx.lineWidth = 2 * uiScale;
+              ctx.lineCap = "round";
+              ctx.lineJoin = "round";
+
+              if (type === "rotate") {
+                const r = iconSize;
+                ctx.beginPath();
+                ctx.arc(0, 0, r, 0, Math.PI * 1.5);
+                ctx.stroke();
+                ctx.beginPath();
+                ctx.moveTo(r + 3 * uiScale, -1 * uiScale);
+                ctx.lineTo(r, 3 * uiScale);
+                ctx.lineTo(r - 3 * uiScale, -1 * uiScale);
+                ctx.stroke();
+              } else if (type === "scale") {
+                ctx.rotate(Math.PI / 4);
+                const s = iconSize;
+                ctx.beginPath();
+                ctx.moveTo(-s, 0);
+                ctx.lineTo(s, 0);
+                ctx.stroke();
+                ctx.beginPath();
+                ctx.moveTo(-s + 3 * uiScale, -3 * uiScale);
+                ctx.lineTo(-s, 0);
+                ctx.lineTo(-s + 3 * uiScale, 3 * uiScale);
+                ctx.stroke();
+                ctx.beginPath();
+                ctx.moveTo(s - 3 * uiScale, -3 * uiScale);
+                ctx.lineTo(s, 0);
+                ctx.lineTo(s - 3 * uiScale, 3 * uiScale);
+                ctx.stroke();
+              } else if (type === "flip") {
+                const w = iconSize;
+                const yOffset = iconSize * 0.4;
+                ctx.beginPath();
+                ctx.moveTo(-w, -yOffset);
+                ctx.lineTo(w, -yOffset);
+                ctx.stroke();
+                ctx.beginPath();
+                ctx.moveTo(w - 2 * uiScale, -yOffset - 2 * uiScale);
+                ctx.lineTo(w, -yOffset);
+                ctx.lineTo(w - 2 * uiScale, -yOffset + 2 * uiScale);
+                ctx.stroke();
+                ctx.beginPath();
+                ctx.moveTo(w, yOffset);
+                ctx.lineTo(-w, yOffset);
+                ctx.stroke();
+                ctx.beginPath();
+                ctx.moveTo(-w + 2 * uiScale, yOffset - 2 * uiScale);
+                ctx.lineTo(-w, yOffset);
+                ctx.lineTo(-w + 2 * uiScale, yOffset + 2 * uiScale);
+                ctx.stroke();
+              } else if (type === "delete") {
+                const s = iconSize * 0.8;
+                ctx.beginPath();
+                ctx.moveTo(-s, -s);
+                ctx.lineTo(s, s);
+                ctx.moveTo(s, -s);
+                ctx.lineTo(-s, s);
+                ctx.stroke();
+              }
+
               ctx.restore();
             };
 
-            drawCameraHandle(tl.x, tl.y); // Top-left - rotate
-            drawCameraHandle(tr.x, tr.y); // Top-right - delete
-            drawCameraHandle(br.x, br.y); // Bottom-right - scale
-            drawCameraHandle(bl.x, bl.y); // Bottom-left - flip
+            drawCameraHandle(tl.x, tl.y, "rotate"); // Top-left - rotate
+            drawCameraHandle(tr.x, tr.y, "delete"); // Top-right - delete
+            drawCameraHandle(br.x, br.y, "scale"); // Bottom-right - scale
+            drawCameraHandle(bl.x, bl.y, "flip"); // Bottom-left - flip
           }
         }
       }
@@ -571,12 +641,15 @@ const Editor = forwardRef<EditorHandle, EditorProps>(
         const dx = x - startInteraction.mouseX;
         const dy = y - startInteraction.mouseY;
 
+        // When mirrored, invert the X movement direction
+        const adjustedDx = isMirrored ? -dx : dx;
+
         setCameraHats((prev) =>
           prev.map((h) =>
             h.uid === selectedCameraHatId
               ? {
                   ...h,
-                  x: startInteraction.startX + dx,
+                  x: startInteraction.startX + adjustedDx,
                   y: startInteraction.startY + dy,
                 }
               : h
