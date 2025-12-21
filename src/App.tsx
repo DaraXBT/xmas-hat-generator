@@ -164,7 +164,7 @@ const App: React.FC = () => {
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-4">
                 <img
-                  src="https://scontent.fpnh9-1.fna.fbcdn.net/v/t39.30808-6/597881331_1180023364324702_3214156598873248831_n.jpg?_nc_cat=1&ccb=1-7&_nc_sid=833d8c&_nc_eui2=AeEJ6ulNXI7CYK7uj7Iw_UY3utCTeQsYHCa60JN5CxgcJrxncR2iY1zHPGIoig1fGy2r2gs9Jsry3kWAP1Xf6Qnq&_nc_ohc=smC44kRB8agQ7kNvwGEq4J9&_nc_oc=AdnyUhKKjm_0DJCc-a3G7_kUyarHt_GBuLolmWVTutoVPbkBjFtVdoCNaAExyYsUCK8&_nc_zt=23&_nc_ht=scontent.fpnh9-1.fna&_nc_gid=hqnMs2TCNPzJfT43TdAcZw&oh=00_AfnSC2bc_fDSmLt-3g_BrGiWGCJ-4RWXx5MzIXLFpj7gCQ&oe=69443D8C"
+                  src="/public/logo.jpg"
                   alt="Logo"
                   className="w-12 h-12 object-cover rounded-lg shadow-md"
                 />
