@@ -164,7 +164,7 @@ const App: React.FC = () => {
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-4">
                 <img
-                  src="/public/logo.jpg"
+                  src="/logo.jpg"
                   alt="Logo"
                   className="w-12 h-12 object-cover rounded-lg shadow-md"
                 />
