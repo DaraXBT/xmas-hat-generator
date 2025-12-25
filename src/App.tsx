@@ -1,7 +1,8 @@
 import React, {useState, useRef, useEffect} from "react";
-import {Upload, Download, Copy, Check, Volume2, VolumeX} from "lucide-react";
+import {Upload, Download, Copy, Check, Volume2, VolumeX, Snowflake} from "lucide-react";
 import Editor, {EditorHandle} from "./components/Editor";
 import HatSelector from "./components/HatSelector";
+import SnowEffect from "./components/SnowEffect";
 import {Hat} from "./types";
 
 const App: React.FC = () => {
@@ -9,6 +10,7 @@ const App: React.FC = () => {
   const [hasImage, setHasImage] = useState(false);
   const [isCopied, setIsCopied] = useState(false);
   const [isPlaying, setIsPlaying] = useState(false);
+  const [isSnowing, setIsSnowing] = useState(true);
   const editorRef = useRef<EditorHandle>(null);
   const audioRef = useRef<HTMLAudioElement | null>(null);
 
@@ -130,6 +132,9 @@ const App: React.FC = () => {
 
   return (
     <div className="min-h-screen w-full bg-white relative text-gray-800">
+      {/* Snow Effect */}
+      {isSnowing && <SnowEffect />}
+
       {/* Crosshatch Art - Light Pattern */}
       <div
         className="absolute inset-0 z-0 pointer-events-none"
@@ -177,23 +182,37 @@ const App: React.FC = () => {
                   </p>
                 </div>
               </div>
-              {/* Music Toggle */}
-              <button
-                onClick={toggleMusic}
-                className={`w-10 h-10 rounded-full flex items-center justify-center transition-all ${
-                  isPlaying
-                    ? "bg-red-500 hover:bg-red-600 shadow-lg"
-                    : "bg-gray-100 hover:bg-gray-200 border border-gray-200"
-                }`}
-                title={
-                  isPlaying ? "🎄 Jingle Bells Playing" : "🔔 Play Jingle Bells"
-                }>
-                {isPlaying ? (
-                  <Volume2 className="w-4 h-4 text-white" />
-                ) : (
-                  <VolumeX className="w-4 h-4 text-gray-600" />
-                )}
-              </button>
+              <div className="flex items-center gap-2">
+                {/* Snow Toggle */}
+                <button
+                  onClick={() => setIsSnowing(!isSnowing)}
+                  className={`w-10 h-10 rounded-full flex items-center justify-center transition-all ${
+                    isSnowing
+                      ? "bg-blue-500 hover:bg-blue-600 shadow-lg"
+                      : "bg-gray-100 hover:bg-gray-200 border border-gray-200"
+                  }`}
+                  title={isSnowing ? "❄️ Stop Snowing" : "🌨️ Let it Snow"}>
+                    <Snowflake className={`w-4 h-4 ${isSnowing ? "text-white" : "text-gray-600"}`} />
+                </button>
+
+                {/* Music Toggle */}
+                <button
+                  onClick={toggleMusic}
+                  className={`w-10 h-10 rounded-full flex items-center justify-center transition-all ${
+                    isPlaying
+                      ? "bg-red-500 hover:bg-red-600 shadow-lg"
+                      : "bg-gray-100 hover:bg-gray-200 border border-gray-200"
+                  }`}
+                  title={
+                    isPlaying ? "🎄 Jingle Bells Playing" : "🔔 Play Jingle Bells"
+                  }>
+                  {isPlaying ? (
+                    <Volume2 className="w-4 h-4 text-white" />
+                  ) : (
+                    <VolumeX className="w-4 h-4 text-gray-600" />
+                  )}
+                </button>
+              </div>
             </div>
           </div>
         </header>
@@ -292,18 +311,17 @@ const App: React.FC = () => {
                 © 2025 KH Christmas Hat Generator
               </p>
               <a
-                href="https://x.com/wolfyxbt"
+                href="https://x.com/drv3v"
                 target="_blank"
                 rel="noopener noreferrer"
                 className="inline-flex items-center gap-2 text-xs text-gray-600 hover:text-gray-900 transition-colors group">
-                <span>Credit to</span>
                 <svg
                   viewBox="0 0 24 24"
                   className="w-3.5 h-3.5 fill-current group-hover:scale-110 transition-transform"
                   aria-hidden="true">
                   <path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z" />
                 </svg>
-                <span className="font-semibold">@wolfyxbt</span>
+                <span className="font-semibold">@drv3v</span>
               </a>
             </div>
           </div>
